@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Website Blocker Extension</title>
+    <link rel="stylesheet" type="text/css" href="popup.css">
+    <script src="popup.js"></script>
+</head>
+
+<body>
+    <h2>Simple Website Blocker</h2>
+    <p id="pWebsiteIsBlocked" style="display: none;color: red;"></p>
+    <p>Enter websites to block:</p>
+    <input style="width: 100%;" id="websiteUrl" type="url" />
+    <div id="actionButtons">
+        <button id="blockButton" type="button">Block</button>
+        <button id="unblockButton" type="button">Unblock</button>
+        <button id="showBlockedButton" type="button">Show Blocked</button>
+    </div>
+    <div id="blockedWebsites" style="display: none;">
+        <p>Blocked Websites:</p>
+        <button id="clearAllBlocked" type="button">Unblock All</button>
+        <ul id="blockedWebsitesList" style="padding: 0;"></ul>
+    </div>
+</body>
+
+</html>
