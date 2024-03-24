@@ -3,7 +3,7 @@
   "name": "Simple Website Blocker",
   "version": "1.0",
   "description": "Temporarily block websites to increase productivity.",
-  "permissions": ["storage", "scripting", "declarativeNetRequest", "activeTab"],
+  "permissions": ["storage", "declarativeNetRequest", "activeTab"],
   "action": {
     "default_popup": "popup/popup.html",
     "default_icon": {
