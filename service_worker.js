@@ -20,7 +20,7 @@ function getNewBlockRule(id, site) {
       type: "block"
     },
     condition: {
-      urlFilter: getUrlMatchPattern(site), 
+      urlFilter: getUrlMatchPattern(site.hostname), 
       resourceTypes: ["main_frame"]
     }
   };
@@ -31,7 +31,7 @@ chrome.runtime.onInstalled.addListener(async () => {
 
   const oldRules = await getPresentRuleIds();
   chrome.storage.local.get({ blockedWebsites: [] }, function (data) {
-    let blockedWebsites = data.blockedWebsites;
+    let blockedWebsites = data.blockedWebsites.filter(site => site.status === /*WEBISTE_BLOCK_STATUS.ACTIVE*/ 0);
     let index = RULES_START_ID;
     let rules = blockedWebsites.map(site => getNewBlockRule(index++, site));
     chrome.declarativeNetRequest.updateDynamicRules({
@@ -50,7 +50,7 @@ chrome.storage.onChanged.addListener(async (changes, namespace) => {
   for (let [key, { oldValue, newValue }] of Object.entries(changes)) {
     if (key !== "blockedWebsites") continue;
     for (let site of newValue) {
-      if (site === "") continue;
+      if (site.hostname === "" || site.status !== /*WEBISTE_BLOCK_STATUS.ACTIVE*/ 0) continue;
       rules.push(getNewBlockRule(index++, site));
     }
   }

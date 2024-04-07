@@ -9,7 +9,11 @@ document.addEventListener('DOMContentLoaded', function () {
     var websiteUrl = document.getElementById('websiteUrl').value;
     chrome.storage.local.get({ blockedWebsites: [] }, function (data) {
       var blockedWebsites = data.blockedWebsites;
-      blockedWebsites.push(websiteUrl);
+      blockedWebsites.push({
+        hostname: websiteUrl,
+        status: WEBISTE_BLOCK_STATUS.ACTIVE,
+        type: WEBISTE_BLOCK_TYPE.PERMANENT
+      });
       chrome.storage.local.set({ blockedWebsites: blockedWebsites }, function () {
         showInfoWebsiteBlocked(true);
       });
@@ -39,24 +43,65 @@ document.addEventListener('DOMContentLoaded', function () {
       for (const site of blockedWebsites) {
         let li = document.createElement('li');
         li.style.listStyleType = 'none';
-        let deleteButton = document.createElement('button');
-        deleteButton.style.marginRight = '10px';
-        deleteButton.appendChild(document.createTextNode('x'));
-        deleteButton.addEventListener('click', function () {
-          unblockWebsite(site, function () {
-            li.remove();
-            let currentWebsiteUrl = document.getElementById('websiteUrl').value;
-            if (currentWebsiteUrl === site)
-              refreshActiveTab();
-          });
-        });
+        let deleteButton = getDeleteButton(site.hostname, li);
+        let playPauseButton = getPlayPauseButton(site, li);
         li.appendChild(deleteButton);
-        li.appendChild(document.createTextNode(site));
+        li.appendChild(playPauseButton);
+        li.appendChild(document.createTextNode(site.hostname));
         blockedWebsitesList.appendChild(li);
       }
       toggleWebsitesList();
     });
   });
+
+  getDeleteButton = function (websiteUrl, li) {
+    let deleteButton = document.createElement('button');
+    deleteButton.style.marginRight = '2px';
+    deleteButton.title = 'Delete';
+    deleteButton.appendChild(document.createTextNode('x'));
+    deleteButton.addEventListener('click', function () {
+      unblockWebsite(websiteUrl, function () {
+        li.remove();
+        let currentWebsiteUrl = document.getElementById('websiteUrl').value;
+        if (currentWebsiteUrl === websiteUrl)
+          refreshActiveTab();
+      });
+    });
+    return deleteButton;
+  }
+
+  getPlayPauseButton = function (site, li) {
+    let playPauseButton = document.createElement('button');
+    playPauseButton.style.marginRight = '10px';
+    if (site.status === WEBISTE_BLOCK_STATUS.ACTIVE) {
+      playPauseButton.appendChild(document.createTextNode('||'));
+      playPauseButton.title = 'Pause';
+    } else {
+      playPauseButton.appendChild(document.createTextNode('>'));
+      playPauseButton.title = 'Resume';
+      li.style.textDecoration = 'line-through';
+    }
+    playPauseButton.addEventListener('click', function () {
+      updateWebsiteBlockStatus(site, function () {
+        site.status = site.status === WEBISTE_BLOCK_STATUS.ACTIVE 
+          ? WEBISTE_BLOCK_STATUS.INACTIVE 
+          : WEBISTE_BLOCK_STATUS.ACTIVE;
+        if (site.status === WEBISTE_BLOCK_STATUS.ACTIVE) {
+          playPauseButton.title = 'Pause';
+          playPauseButton.innerText = '||';
+          li.style.textDecoration = 'none';
+        } else {
+          playPauseButton.title = 'Resume';
+          playPauseButton.innerText = '>';
+          li.style.textDecoration = 'line-through';
+        }
+        let currentWebsiteUrl = document.getElementById('websiteUrl').value;
+        if (currentWebsiteUrl === site.hostname)
+          refreshActiveTab();
+      });
+    });
+    return playPauseButton;
+  }
 
   chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
     // since only one tab should be active and in the current window at once
@@ -68,8 +113,13 @@ document.addEventListener('DOMContentLoaded', function () {
       document.getElementById('websiteUrl').value = hostname;
     }
 
+    if (hostname === '') {
+      hideInfoWebsiteBlocked();
+      return;
+    }
+
     chrome.storage.local.get({ blockedWebsites: [] }, function (data) {
-      var blockedWebsites = data.blockedWebsites;
+      var blockedWebsites = data.blockedWebsites.map(site => site.hostname);
       if (blockedWebsites.some(site => site.includes(hostname))) {
         showInfoWebsiteBlocked();
       } else {
@@ -82,9 +132,25 @@ document.addEventListener('DOMContentLoaded', function () {
 function unblockWebsite(websiteUrl, callback) {
   chrome.storage.local.get({ blockedWebsites: [] }, function (data) {
     var blockedWebsites = data.blockedWebsites;
-    var index = blockedWebsites.indexOf(websiteUrl);
+    var index = blockedWebsites.findIndex(x => x.hostname === websiteUrl);
     if (index > -1) {
       blockedWebsites.splice(index, 1);
+      chrome.storage.local.set({ blockedWebsites: blockedWebsites }, function () {
+        callback();
+      });
+    }
+  });
+}
+
+function updateWebsiteBlockStatus(site, callback) {
+  chrome.storage.local.get({ blockedWebsites: [] }, function (data) {
+    var blockedWebsites = data.blockedWebsites;
+    var index = blockedWebsites.findIndex(x => x.hostname === site.hostname);
+    if (index > -1) {
+      blockedWebsites[index].status = 
+        blockedWebsites[index].status === WEBISTE_BLOCK_STATUS.ACTIVE 
+        ? WEBISTE_BLOCK_STATUS.INACTIVE 
+        : WEBISTE_BLOCK_STATUS.ACTIVE;
       chrome.storage.local.set({ blockedWebsites: blockedWebsites }, function () {
         callback();
       });
