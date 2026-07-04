@@ -28,6 +28,11 @@ h1 {
   margin: 0 0 4px;
 }
 
+.section-title {
+  font-size: 18px;
+  margin: 0 0 14px;
+}
+
 #summaryText {
   color: #6b7280;
   margin: 0;
@@ -103,6 +108,7 @@ button:hover {
 .control-group {
   border: 0;
   display: flex;
+  flex-wrap: wrap;
   gap: 14px;
   margin: 0;
   padding: 0;
@@ -131,13 +137,114 @@ button:hover {
   width: 110px;
 }
 
-#formMessage {
+.schedule-panel {
+  border-top: 1px solid #e5e7eb;
+  display: none;
+  margin-top: 16px;
+  padding-top: 14px;
+}
+
+.schedule-builder {
+  border-top: 1px solid #e5e7eb;
+  margin-top: 14px;
+  padding-top: 14px;
+}
+
+.weekday-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(7, minmax(0, auto));
+  justify-content: start;
+  margin-bottom: 12px;
+}
+
+.weekday-grid label {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+}
+
+.weekday-grid input {
+  min-height: auto;
+  width: auto;
+}
+
+.schedule-time-row {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto 130px auto 130px auto;
+  margin-bottom: 12px;
+}
+
+#scheduleIntervalsList {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.schedule-interval {
+  align-items: center;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 8px 10px;
+}
+
+#scheduleList {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+}
+
+.schedule-row {
+  align-items: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 12px;
+}
+
+.schedule-details {
+  min-width: 0;
+}
+
+.schedule-name {
+  display: block;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.schedule-meta {
+  color: #6b7280;
+  display: block;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.schedule-actions {
+  display: flex;
+  gap: 8px;
+}
+
+#formMessage,
+#scheduleMessage {
   color: #047857;
   min-height: 18px;
   margin: 10px 0 0;
 }
 
-#formMessage.error {
+#formMessage.error,
+#scheduleMessage.error {
   color: #b91c1c;
 }
 
@@ -209,11 +316,18 @@ button:hover {
   }
 
   .option-grid,
-  .blocked-row {
+  .blocked-row,
+  .schedule-row,
+  .schedule-time-row {
     grid-template-columns: 1fr;
   }
 
-  .entry-actions {
+  .weekday-grid {
+    grid-template-columns: repeat(4, minmax(0, auto));
+  }
+
+  .entry-actions,
+  .schedule-actions {
     flex-wrap: wrap;
   }
 }

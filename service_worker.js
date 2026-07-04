@@ -24,12 +24,16 @@ function updateDynamicRules(options) {
   });
 }
 
-function getStoredBlockedWebsites() {
+function getStoredData() {
   return new Promise(resolve => {
     const defaults = {};
     defaults[WebsiteBlocker.STORAGE_KEY] = [];
+    defaults[WebsiteBlocker.SCHEDULES_STORAGE_KEY] = [];
     chrome.storage.local.get(defaults, function (data) {
-      resolve(data[WebsiteBlocker.STORAGE_KEY]);
+      resolve({
+        blockedWebsites: data[WebsiteBlocker.STORAGE_KEY],
+        schedules: WebsiteBlocker.normalizeStoredSchedules(data[WebsiteBlocker.SCHEDULES_STORAGE_KEY])
+      });
     });
   });
 }
@@ -53,15 +57,15 @@ function getNewBlockRule(id, site) {
   };
 }
 
-function getActiveBlockedWebsites(blockedWebsites) {
-  return WebsiteBlocker.normalizeBlockedWebsites(blockedWebsites)
+function getActiveBlockedWebsites(blockedWebsites, schedules) {
+  return WebsiteBlocker.hydrateEntriesWithSchedules(blockedWebsites, schedules)
     .filter(site => WebsiteBlocker.isEntryBlocking(site));
 }
 
-async function refreshBlockRules(blockedWebsites) {
+async function refreshBlockRules(blockedWebsites, schedules) {
   const oldRules = await getPresentRuleIds();
   let index = RULES_START_ID;
-  const rules = getActiveBlockedWebsites(blockedWebsites)
+  const rules = getActiveBlockedWebsites(blockedWebsites, schedules)
     .slice(0, RULES_END_ID - RULES_START_ID)
     .map(site => getNewBlockRule(index++, site));
 
@@ -71,27 +75,28 @@ async function refreshBlockRules(blockedWebsites) {
   });
 }
 
-function scheduleExpirationAlarm(blockedWebsites) {
-  chrome.alarms.clear(WebsiteBlocker.EXPIRATION_ALARM_NAME, function () {
-    const nextExpiration = WebsiteBlocker.getNextExpiration(blockedWebsites);
-    if (!nextExpiration) return;
+function scheduleRuleRefreshAlarm(blockedWebsites, schedules) {
+  chrome.alarms.clear(WebsiteBlocker.RULE_REFRESH_ALARM_NAME, function () {
+    const hydratedWebsites = WebsiteBlocker.hydrateEntriesWithSchedules(blockedWebsites, schedules);
+    const nextRefresh = WebsiteBlocker.getNextRuleRefreshTime(hydratedWebsites);
+    if (!nextRefresh) return;
 
-    chrome.alarms.create(WebsiteBlocker.EXPIRATION_ALARM_NAME, {
-      when: Math.max(Date.now() + 1000, nextExpiration)
+    chrome.alarms.create(WebsiteBlocker.RULE_REFRESH_ALARM_NAME, {
+      when: Math.max(Date.now() + 1000, nextRefresh)
     });
   });
 }
 
 async function reconcileBlockedWebsites() {
-  const blockedWebsites = await getStoredBlockedWebsites();
-  const expirationResult = WebsiteBlocker.expireEntries(blockedWebsites);
+  const storedData = await getStoredData();
+  const expirationResult = WebsiteBlocker.expireEntries(storedData.blockedWebsites);
 
   if (expirationResult.changed) {
     await saveBlockedWebsites(expirationResult.entries);
   }
 
-  await refreshBlockRules(expirationResult.entries);
-  scheduleExpirationAlarm(expirationResult.entries);
+  await refreshBlockRules(expirationResult.entries, storedData.schedules);
+  scheduleRuleRefreshAlarm(expirationResult.entries, storedData.schedules);
 }
 
 chrome.runtime.onInstalled.addListener(function () {
@@ -103,20 +108,13 @@ chrome.runtime.onStartup.addListener(function () {
 });
 
 chrome.alarms.onAlarm.addListener(function (alarm) {
-  if (alarm.name !== WebsiteBlocker.EXPIRATION_ALARM_NAME) return;
+  if (alarm.name !== WebsiteBlocker.RULE_REFRESH_ALARM_NAME) return;
   reconcileBlockedWebsites();
 });
 
 chrome.storage.onChanged.addListener(function (changes, namespace) {
   if (namespace !== 'local') return;
-  if (!changes[WebsiteBlocker.STORAGE_KEY]) return;
+  if (!changes[WebsiteBlocker.STORAGE_KEY] && !changes[WebsiteBlocker.SCHEDULES_STORAGE_KEY]) return;
 
-  const expirationResult = WebsiteBlocker.expireEntries(changes[WebsiteBlocker.STORAGE_KEY].newValue || []);
-  if (expirationResult.changed) {
-    saveBlockedWebsites(expirationResult.entries);
-    return;
-  }
-
-  refreshBlockRules(expirationResult.entries);
-  scheduleExpirationAlarm(expirationResult.entries);
+  reconcileBlockedWebsites();
 });

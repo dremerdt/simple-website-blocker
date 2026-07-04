@@ -13,13 +13,16 @@ document.addEventListener('DOMContentLoaded', function () {
     blockScopeRadios: document.querySelectorAll('input[name="blockScopeRadio"]'),
     durationPanel: document.getElementById('blockConfigurationTemporary'),
     durationInput: document.getElementById('blockDuration'),
-    durationUnit: document.getElementById('blockDurationUnit')
+    durationUnit: document.getElementById('blockDurationUnit'),
+    schedulePanel: document.getElementById('blockConfigurationSchedule'),
+    scheduleSelect: document.getElementById('scheduleSelect')
   };
 
   const state = {
     activeHostname: '',
     activeUrl: '',
-    lastPrefill: ''
+    lastPrefill: '',
+    schedules: []
   };
 
   refs.blockButton.addEventListener('click', function () {
@@ -27,16 +30,26 @@ document.addEventListener('DOMContentLoaded', function () {
     const durationMs = type === WEBSITE_BLOCK_TYPE.TEMPORARY
       ? WebsiteBlocker.getDurationMs(refs.durationInput.value, refs.durationUnit.value)
       : 0;
+    const schedule = type === WEBSITE_BLOCK_TYPE.SCHEDULED
+      ? getSelectedScheduleDefinition(refs, state)
+      : null;
+
+    if (type === WEBSITE_BLOCK_TYPE.SCHEDULED && !schedule) {
+      showInfoMessage('Create or select a schedule in Manage first.', false);
+      return;
+    }
 
     const entry = WebsiteBlocker.createEntry(refs.websiteInput.value, {
       scope: getSelectedBlockScope(),
       type,
       status: WEBSITE_BLOCK_STATUS.ACTIVE,
-      durationMs
+      durationMs,
+      scheduleId: schedule ? schedule.id : '',
+      scheduleName: schedule ? schedule.name : ''
     });
 
     if (!entry) {
-      showInfoMessage('Enter a valid website or duration.', false);
+      showInfoMessage('Enter a valid website, duration, or schedule.', false);
       return;
     }
 
@@ -45,8 +58,12 @@ document.addEventListener('DOMContentLoaded', function () {
       saveBlockedWebsites(nextBlockedWebsites, function () {
         refs.websiteInput.value = WebsiteBlocker.getDisplayTarget(entry);
         state.lastPrefill = refs.websiteInput.value;
-        showInfoWebsiteBlocked(true);
+        const hydratedEntry = WebsiteBlocker.hydrateEntrySchedule(entry, state.schedules);
         renderBlockedList(nextBlockedWebsites, refs, state);
+        updateActiveBlockInfo(refs, state);
+        if (WebsiteBlocker.isEntryBlocking(hydratedEntry)) {
+          refreshActiveTab();
+        }
       });
     });
   });
@@ -61,7 +78,8 @@ document.addEventListener('DOMContentLoaded', function () {
     readBlockedWebsites(function (blockedWebsites) {
       let nextBlockedWebsites = WebsiteBlocker.removeEntry(blockedWebsites, blockInput);
       if (nextBlockedWebsites.length === blockedWebsites.length) {
-        const matchingEntry = blockedWebsites.find(site =>
+        const hydratedWebsites = WebsiteBlocker.hydrateEntriesWithSchedules(blockedWebsites, state.schedules);
+        const matchingEntry = hydratedWebsites.find(site =>
           getCurrentCandidateInputs(refs, state).some(input => WebsiteBlocker.doesEntryMatchInput(site, input))
         );
 
@@ -129,6 +147,12 @@ document.addEventListener('DOMContentLoaded', function () {
     updateActiveBlockInfo(refs, state);
   });
 
+  readSchedules(function (schedules) {
+    state.schedules = schedules;
+    renderScheduleOptions(refs, state);
+    updateActiveBlockInfo(refs, state);
+  });
+
   updateBlockConfigurationVisibility(refs);
   updateInputPlaceholder(refs);
 });
@@ -156,10 +180,20 @@ function saveBlockedWebsites(blockedWebsites, callback) {
   chrome.storage.local.set(value, callback);
 }
 
+function readSchedules(callback) {
+  const defaults = {};
+  defaults[WebsiteBlocker.SCHEDULES_STORAGE_KEY] = [];
+
+  chrome.storage.local.get(defaults, function (data) {
+    callback(WebsiteBlocker.normalizeStoredSchedules(data[WebsiteBlocker.SCHEDULES_STORAGE_KEY]));
+  });
+}
+
 function renderBlockedList(blockedWebsites, refs, state) {
+  const hydratedWebsites = WebsiteBlocker.hydrateEntriesWithSchedules(blockedWebsites, state.schedules);
   refs.blockedList.innerHTML = '';
 
-  if (blockedWebsites.length === 0) {
+  if (hydratedWebsites.length === 0) {
     const li = document.createElement('li');
     li.className = 'empty-list';
     li.textContent = 'No blocked websites.';
@@ -167,7 +201,7 @@ function renderBlockedList(blockedWebsites, refs, state) {
     return;
   }
 
-  for (const site of blockedWebsites) {
+  for (const site of hydratedWebsites) {
     const li = document.createElement('li');
     li.className = 'blocked-item';
     if (!WebsiteBlocker.isEntryBlocking(site)) {
@@ -225,6 +259,10 @@ function getEntryMeta(site) {
     parts.push(expiresText);
   }
 
+  if (site.type === WEBSITE_BLOCK_TYPE.SCHEDULED) {
+    parts.push(site.scheduleName || 'Missing schedule');
+  }
+
   return parts.join(' | ');
 }
 
@@ -244,6 +282,9 @@ function toggleWebsiteBlockStatus(id, refs, state) {
           status: WEBSITE_BLOCK_STATUS.ACTIVE,
           type: WEBSITE_BLOCK_TYPE.PERMANENT,
           expiresAt: null,
+          scheduleId: '',
+          scheduleName: '',
+          schedule: null,
           updatedAt: Date.now()
         };
       }
@@ -284,7 +325,8 @@ function updateActiveBlockInfo(refs, state) {
   }
 
   readBlockedWebsites(function (blockedWebsites) {
-    const isBlocked = blockedWebsites.some(site =>
+    const hydratedWebsites = WebsiteBlocker.hydrateEntriesWithSchedules(blockedWebsites, state.schedules);
+    const isBlocked = hydratedWebsites.some(site =>
       candidateInputs.some(input => WebsiteBlocker.doesEntryMatchInput(site, input))
     );
 
@@ -319,6 +361,33 @@ function getSelectedBlockType() {
 function updateBlockConfigurationVisibility(refs) {
   refs.durationPanel.style.display =
     getSelectedBlockType() === WEBSITE_BLOCK_TYPE.TEMPORARY ? 'flex' : 'none';
+  refs.schedulePanel.style.display =
+    getSelectedBlockType() === WEBSITE_BLOCK_TYPE.SCHEDULED ? 'block' : 'none';
+}
+
+function renderScheduleOptions(refs, state) {
+  refs.scheduleSelect.innerHTML = '';
+
+  if (state.schedules.length === 0) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = 'Create a schedule in Manage';
+    refs.scheduleSelect.appendChild(option);
+    refs.scheduleSelect.disabled = true;
+    return;
+  }
+
+  refs.scheduleSelect.disabled = false;
+  state.schedules.forEach(schedule => {
+    const option = document.createElement('option');
+    option.value = schedule.id;
+    option.textContent = schedule.name;
+    refs.scheduleSelect.appendChild(option);
+  });
+}
+
+function getSelectedScheduleDefinition(refs, state) {
+  return state.schedules.find(schedule => schedule.id === refs.scheduleSelect.value) || null;
 }
 
 function updateInputForSelectedScope(refs, state) {

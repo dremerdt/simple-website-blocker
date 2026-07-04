@@ -43,6 +43,10 @@
           <input type="radio" name="blockTypeRadio" value="1">
           Temporary
         </label>
+        <label>
+          <input type="radio" name="blockTypeRadio" value="3">
+          Scheduled
+        </label>
       </fieldset>
 
       <div id="blockConfigurationTemporary" class="duration-row">
@@ -53,6 +57,11 @@
           <option value="hours">hours</option>
           <option value="days">days</option>
         </select>
+      </div>
+
+      <div id="blockConfigurationSchedule" class="schedule-panel">
+        <label class="field-label" for="scheduleSelect">Schedule</label>
+        <select id="scheduleSelect"></select>
       </div>
     </div>
 

@@ -45,6 +45,10 @@
             <input type="radio" name="entryType" value="1">
             Temporary
           </label>
+          <label>
+            <input type="radio" name="entryType" value="3">
+            Scheduled
+          </label>
         </fieldset>
       </div>
 
@@ -58,6 +62,11 @@
         </select>
       </div>
 
+      <div id="entrySchedulePanel" class="schedule-panel">
+        <label class="field-label" for="entryScheduleSelect">Schedule</label>
+        <select id="entryScheduleSelect"></select>
+      </div>
+
       <p id="formMessage" role="status"></p>
 
       <div class="button-row">
@@ -65,6 +74,43 @@
         <button id="resetFormButton" type="button">Reset</button>
         <button id="clearExpiredButton" type="button">Clear Expired</button>
       </div>
+    </section>
+
+    <section class="editor-panel">
+      <h2 class="section-title">Schedules</h2>
+      <input id="scheduleEditId" type="hidden" />
+
+      <label class="field-label" for="scheduleName">Schedule name</label>
+      <input id="scheduleName" type="text" placeholder="Work hours" />
+
+      <div class="schedule-builder">
+        <div class="weekday-grid">
+          <label><input type="checkbox" name="scheduleDay" value="1" checked>Mon</label>
+          <label><input type="checkbox" name="scheduleDay" value="2" checked>Tue</label>
+          <label><input type="checkbox" name="scheduleDay" value="3" checked>Wed</label>
+          <label><input type="checkbox" name="scheduleDay" value="4" checked>Thu</label>
+          <label><input type="checkbox" name="scheduleDay" value="5" checked>Fri</label>
+          <label><input type="checkbox" name="scheduleDay" value="6">Sat</label>
+          <label><input type="checkbox" name="scheduleDay" value="0">Sun</label>
+        </div>
+        <div class="schedule-time-row">
+          <label for="scheduleStart">Start</label>
+          <input id="scheduleStart" type="time" value="09:00" />
+          <label for="scheduleEnd">End</label>
+          <input id="scheduleEnd" type="time" value="18:00" />
+          <button id="addScheduleIntervalButton" type="button">Add Interval</button>
+        </div>
+        <ul id="scheduleIntervalsList"></ul>
+      </div>
+
+      <p id="scheduleMessage" role="status"></p>
+
+      <div class="button-row">
+        <button id="saveScheduleButton" type="button" class="primary-button">Save Schedule</button>
+        <button id="resetScheduleButton" type="button">Reset Schedule</button>
+      </div>
+
+      <ul id="scheduleList"></ul>
     </section>
 
     <section class="list-panel">

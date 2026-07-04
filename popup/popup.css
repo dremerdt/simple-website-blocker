@@ -88,7 +88,8 @@ button:disabled {
 }
 
 .configuration-panel,
-.blocked-panel {
+.blocked-panel,
+.schedule-panel {
   display: none;
 }
 
@@ -101,6 +102,7 @@ button:disabled {
 .control-group {
   border: 0;
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   margin: 0 0 12px;
   padding: 0;
@@ -129,6 +131,14 @@ button:disabled {
 .duration-row select {
   flex: 1;
   min-width: 0;
+}
+
+.schedule-panel {
+  margin-top: 10px;
+}
+
+.schedule-panel select {
+  width: 100%;
 }
 
 .button-row {
