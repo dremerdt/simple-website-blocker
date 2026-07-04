@@ -2,29 +2,74 @@
 <html>
 
 <head>
-    <title>Website Blocker Extension</title>
-    <link rel="stylesheet" type="text/css" href="popup.css">
-    <script src="../constants.js"></script>
-    <script src="popup.js"></script>
+  <meta charset="utf-8">
+  <title>Website Blocker Extension</title>
+  <link rel="stylesheet" type="text/css" href="popup.css">
+  <script src="../constants.js"></script>
+  <script src="../shared.js"></script>
+  <script src="popup.js"></script>
 </head>
 
 <body>
-    <p id="pWebsiteIsBlocked" style="display: none;color: red;"></p>
-    <p>Enter website:</p>
-    <div>
-        <input style="width: 250px" id="websiteUrl" type="url" />
-        <button id="moreButton" type="button">...</button>
+  <main class="popup-shell">
+    <p id="pWebsiteIsBlocked" role="status"></p>
+
+    <label class="field-label" for="websiteUrl">Website</label>
+    <div id="mainInput" class="input-row">
+      <input id="websiteUrl" type="text" placeholder="example.com" />
+      <button id="moreButton" type="button">Options</button>
     </div>
-    <div id="actionButtons">
-        <button id="blockButton" type="button">Block</button>
-        <button id="unblockButton" type="button">Unblock</button>
-        <button id="showBlockedButton" type="button">Show Blocked</button>
+
+    <div id="blockConfiguration" class="configuration-panel">
+      <fieldset class="control-group">
+        <legend>Scope</legend>
+        <label>
+          <input type="radio" name="blockScopeRadio" value="domain" checked>
+          Domain
+        </label>
+        <label>
+          <input type="radio" name="blockScopeRadio" value="url">
+          URL
+        </label>
+      </fieldset>
+
+      <fieldset class="control-group">
+        <legend>Type</legend>
+        <label>
+          <input type="radio" name="blockTypeRadio" value="0" checked>
+          Permanent
+        </label>
+        <label>
+          <input type="radio" name="blockTypeRadio" value="1">
+          Temporary
+        </label>
+      </fieldset>
+
+      <div id="blockConfigurationTemporary" class="duration-row">
+        <label for="blockDuration">Duration</label>
+        <input id="blockDuration" type="number" min="1" max="365" value="30" />
+        <select id="blockDurationUnit">
+          <option value="minutes">minutes</option>
+          <option value="hours">hours</option>
+          <option value="days">days</option>
+        </select>
+      </div>
     </div>
-    <div id="blockedWebsites" style="display: none;">
-        <p style="margin-block-end: 0;">Blocked Websites:</p>
-        <button id="clearAllBlocked" type="button">Unblock All</button>
-        <ul id="blockedWebsitesList" style="padding: 0; margin-block-start: 0;"></ul>
+
+    <div id="actionButtons" class="button-row">
+      <button id="blockButton" type="button" class="primary-button">Block</button>
+      <button id="unblockButton" type="button">Unblock</button>
+      <button id="showBlockedButton" type="button">Show List</button>
     </div>
+
+    <section id="blockedWebsites" class="blocked-panel">
+      <div class="section-heading">
+        <p>Blocked Websites</p>
+        <button id="clearAllBlocked" type="button">Clear All</button>
+      </div>
+      <ul id="blockedWebsitesList"></ul>
+    </section>
+  </main>
 </body>
 
 </html>

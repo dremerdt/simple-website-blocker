@@ -1,11 +1,84 @@
 <!DOCTYPE html>
 <html>
+
 <head>
+  <meta charset="utf-8">
+  <title>Manage Blocked Websites</title>
   <link rel="stylesheet" type="text/css" href="manage.css">
 </head>
+
 <body>
-  <h2>Manage Blocked Websites</h2>
-  <ul id="blockedList"></ul>
+  <main class="manage-shell">
+    <header class="page-header">
+      <div>
+        <h1>Blocked Websites</h1>
+        <p id="summaryText">No blocked entries.</p>
+      </div>
+    </header>
+
+    <section class="editor-panel">
+      <input id="editEntryId" type="hidden" />
+
+      <label class="field-label" for="entryTarget">Website or URL</label>
+      <input id="entryTarget" type="text" placeholder="example.com" />
+
+      <div class="option-grid">
+        <fieldset class="control-group">
+          <legend>Scope</legend>
+          <label>
+            <input type="radio" name="entryScope" value="domain" checked>
+            Domain
+          </label>
+          <label>
+            <input type="radio" name="entryScope" value="url">
+            URL
+          </label>
+        </fieldset>
+
+        <fieldset class="control-group">
+          <legend>Type</legend>
+          <label>
+            <input type="radio" name="entryType" value="0" checked>
+            Permanent
+          </label>
+          <label>
+            <input type="radio" name="entryType" value="1">
+            Temporary
+          </label>
+        </fieldset>
+      </div>
+
+      <div id="entryDurationRow" class="duration-row">
+        <label for="entryDuration">Duration</label>
+        <input id="entryDuration" type="number" min="1" max="365" value="30" />
+        <select id="entryDurationUnit">
+          <option value="minutes">minutes</option>
+          <option value="hours">hours</option>
+          <option value="days">days</option>
+        </select>
+      </div>
+
+      <p id="formMessage" role="status"></p>
+
+      <div class="button-row">
+        <button id="saveEntryButton" type="button" class="primary-button">Save</button>
+        <button id="resetFormButton" type="button">Reset</button>
+        <button id="clearExpiredButton" type="button">Clear Expired</button>
+      </div>
+    </section>
+
+    <section class="list-panel">
+      <div class="list-toolbar">
+        <label class="field-label" for="searchEntries">Search</label>
+        <input id="searchEntries" type="search" placeholder="Filter entries" />
+      </div>
+      <ul id="blockedList"></ul>
+    </section>
+  </main>
+
+  <script src="../constants.js"></script>
+  <script src="../shared.js"></script>
   <script src="manage.js"></script>
 </body>
+
 </html>
