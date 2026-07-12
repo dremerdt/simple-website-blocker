@@ -3,20 +3,28 @@ importScripts('constants.js', 'shared.js');
 
 const RULES_START_ID = 70000;
 const RULES_END_ID = RULES_START_ID + chrome.declarativeNetRequest.MAX_NUMBER_OF_DYNAMIC_RULES;
+let reconciliationPromise = null;
+let reconciliationRequested = false;
 
 function getPresentRuleIds() {
-  return new Promise(resolve => {
+  return new Promise((resolve, reject) => {
     chrome.declarativeNetRequest.getDynamicRules(function (oldRules) {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+
       resolve(oldRules.map(rule => rule.id).filter(id => id >= RULES_START_ID && id < RULES_END_ID));
     });
   });
 }
 
 function updateDynamicRules(options) {
-  return new Promise(resolve => {
+  return new Promise((resolve, reject) => {
     chrome.declarativeNetRequest.updateDynamicRules(options, function () {
       if (chrome.runtime.lastError) {
-        console.error(chrome.runtime.lastError.message);
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
       }
 
       resolve();
@@ -25,11 +33,16 @@ function updateDynamicRules(options) {
 }
 
 function getStoredData() {
-  return new Promise(resolve => {
+  return new Promise((resolve, reject) => {
     const defaults = {};
     defaults[WebsiteBlocker.STORAGE_KEY] = [];
     defaults[WebsiteBlocker.SCHEDULES_STORAGE_KEY] = [];
     chrome.storage.local.get(defaults, function (data) {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+
       resolve({
         blockedWebsites: data[WebsiteBlocker.STORAGE_KEY],
         schedules: WebsiteBlocker.normalizeStoredSchedules(data[WebsiteBlocker.SCHEDULES_STORAGE_KEY])
@@ -39,10 +52,17 @@ function getStoredData() {
 }
 
 function saveBlockedWebsites(blockedWebsites) {
-  return new Promise(resolve => {
+  return new Promise((resolve, reject) => {
     const value = {};
     value[WebsiteBlocker.STORAGE_KEY] = WebsiteBlocker.normalizeBlockedWebsites(blockedWebsites);
-    chrome.storage.local.set(value, resolve);
+    chrome.storage.local.set(value, function () {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+
+      resolve();
+    });
   });
 }
 
@@ -64,10 +84,21 @@ function getActiveBlockedWebsites(blockedWebsites, schedules) {
 
 async function refreshBlockRules(blockedWebsites, schedules) {
   const oldRules = await getPresentRuleIds();
+  const activeWebsites = getActiveBlockedWebsites(blockedWebsites, schedules);
+  const maximumRules = RULES_END_ID - RULES_START_ID;
+  const maximumRegexRules = chrome.declarativeNetRequest.MAX_NUMBER_OF_REGEX_RULES || 1000;
+  const regexRuleCount = activeWebsites.filter(site => site.scope === WEBSITE_BLOCK_SCOPE.URL).length;
+
+  if (activeWebsites.length > maximumRules) {
+    throw new Error(`The active block limit of ${maximumRules} has been reached.`);
+  }
+
+  if (regexRuleCount > maximumRegexRules) {
+    throw new Error(`The URL-specific block limit of ${maximumRegexRules} has been reached.`);
+  }
+
   let index = RULES_START_ID;
-  const rules = getActiveBlockedWebsites(blockedWebsites, schedules)
-    .slice(0, RULES_END_ID - RULES_START_ID)
-    .map(site => getNewBlockRule(index++, site));
+  const rules = activeWebsites.map(site => getNewBlockRule(index++, site));
 
   await updateDynamicRules({
     removeRuleIds: oldRules,
@@ -76,13 +107,17 @@ async function refreshBlockRules(blockedWebsites, schedules) {
 }
 
 function scheduleRuleRefreshAlarm(blockedWebsites, schedules) {
-  chrome.alarms.clear(WebsiteBlocker.RULE_REFRESH_ALARM_NAME, function () {
-    const hydratedWebsites = WebsiteBlocker.hydrateEntriesWithSchedules(blockedWebsites, schedules);
-    const nextRefresh = WebsiteBlocker.getNextRuleRefreshTime(hydratedWebsites);
-    if (!nextRefresh) return;
+  return new Promise(resolve => {
+    chrome.alarms.clear(WebsiteBlocker.RULE_REFRESH_ALARM_NAME, function () {
+      const hydratedWebsites = WebsiteBlocker.hydrateEntriesWithSchedules(blockedWebsites, schedules);
+      const nextRefresh = WebsiteBlocker.getNextRuleRefreshTime(hydratedWebsites);
+      if (nextRefresh) {
+        chrome.alarms.create(WebsiteBlocker.RULE_REFRESH_ALARM_NAME, {
+          when: Math.max(Date.now() + 1000, nextRefresh)
+        });
+      }
 
-    chrome.alarms.create(WebsiteBlocker.RULE_REFRESH_ALARM_NAME, {
-      when: Math.max(Date.now() + 1000, nextRefresh)
+      resolve();
     });
   });
 }
@@ -96,25 +131,59 @@ async function reconcileBlockedWebsites() {
   }
 
   await refreshBlockRules(expirationResult.entries, storedData.schedules);
-  scheduleRuleRefreshAlarm(expirationResult.entries, storedData.schedules);
+  await scheduleRuleRefreshAlarm(expirationResult.entries, storedData.schedules);
+}
+
+function requestReconciliation() {
+  reconciliationRequested = true;
+  if (reconciliationPromise) return reconciliationPromise;
+
+  reconciliationPromise = (async function () {
+    while (reconciliationRequested) {
+      reconciliationRequested = false;
+      await reconcileBlockedWebsites();
+    }
+  })().finally(function () {
+    reconciliationPromise = null;
+  });
+
+  return reconciliationPromise;
+}
+
+function reconcileFromEvent() {
+  requestReconciliation().catch(function (error) {
+    console.error(error.message);
+  });
 }
 
 chrome.runtime.onInstalled.addListener(function () {
-  reconcileBlockedWebsites();
+  reconcileFromEvent();
 });
 
 chrome.runtime.onStartup.addListener(function () {
-  reconcileBlockedWebsites();
+  reconcileFromEvent();
 });
 
 chrome.alarms.onAlarm.addListener(function (alarm) {
   if (alarm.name !== WebsiteBlocker.RULE_REFRESH_ALARM_NAME) return;
-  reconcileBlockedWebsites();
+  reconcileFromEvent();
 });
 
 chrome.storage.onChanged.addListener(function (changes, namespace) {
   if (namespace !== 'local') return;
   if (!changes[WebsiteBlocker.STORAGE_KEY] && !changes[WebsiteBlocker.SCHEDULES_STORAGE_KEY]) return;
 
-  reconcileBlockedWebsites();
+  reconcileFromEvent();
+});
+
+chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
+  if (!message || message.type !== WebsiteBlocker.RULE_RECONCILE_MESSAGE) return false;
+
+  requestReconciliation().then(function () {
+    sendResponse({ ok: true });
+  }).catch(function (error) {
+    sendResponse({ ok: false, error: error.message });
+  });
+
+  return true;
 });

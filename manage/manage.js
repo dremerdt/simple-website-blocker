@@ -74,8 +74,36 @@ document.addEventListener('DOMContentLoaded', function () {
   updateTypePanels(refs);
   updateTargetPlaceholder(refs);
   renderScheduleIntervals(refs, state);
+  registerStorageChangeListener(refs, state);
   loadStoredData(refs, state);
 });
+
+function registerStorageChangeListener(refs, state) {
+  chrome.storage.onChanged.addListener(function (changes, namespace) {
+    if (namespace !== 'local') return;
+
+    const blockedWebsitesChange = changes[WebsiteBlocker.STORAGE_KEY];
+    const schedulesChange = changes[WebsiteBlocker.SCHEDULES_STORAGE_KEY];
+    if (!blockedWebsitesChange && !schedulesChange) return;
+
+    if (blockedWebsitesChange) {
+      const expirationResult = WebsiteBlocker.expireEntries(blockedWebsitesChange.newValue || []);
+      state.blockedWebsites = expirationResult.entries;
+      if (expirationResult.changed) {
+        saveBlockedWebsites(expirationResult.entries, function () {});
+      }
+    }
+
+    if (schedulesChange) {
+      const selectedScheduleId = refs.entryScheduleSelect.value;
+      state.schedules = WebsiteBlocker.normalizeStoredSchedules(schedulesChange.newValue || []);
+      renderEntryScheduleOptions(refs, state, selectedScheduleId);
+      renderScheduleList(refs, state);
+    }
+
+    renderBlockedWebsites(refs, state);
+  });
+}
 
 function loadStoredData(refs, state) {
   readStoredData(function (blockedWebsites, schedules) {
@@ -273,7 +301,7 @@ function getEntryMeta(site) {
 }
 
 function getToggleButtonText(site) {
-  if (WebsiteBlocker.isExpiredEntry(site)) return 'Reactivate';
+  if (WebsiteBlocker.isExpiredEntry(site)) return 'Make Permanent';
   return site.status === WEBSITE_BLOCK_STATUS.ACTIVE ? 'Pause' : 'Resume';
 }
 

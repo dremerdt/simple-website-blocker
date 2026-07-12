@@ -3,7 +3,7 @@
   "name": "Simple Website Blocker",
   "version": "1.4",
   "description": "Block websites permanently, temporarily, or on a weekly schedule.",
-  "permissions": ["storage", "declarativeNetRequest", "activeTab", "alarms"],
+  "permissions": ["storage", "declarativeNetRequestWithHostAccess", "alarms"],
   "action": {
     "default_popup": "popup/popup.html",
     "default_icon": {

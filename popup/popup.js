@@ -272,7 +272,7 @@ function getEntryMeta(site) {
 }
 
 function getToggleButtonText(site) {
-  if (WebsiteBlocker.isExpiredEntry(site)) return 'Reactivate';
+  if (WebsiteBlocker.isExpiredEntry(site)) return 'Make Permanent';
   return site.status === WEBSITE_BLOCK_STATUS.ACTIVE ? 'Pause' : 'Resume';
 }
 
@@ -465,11 +465,20 @@ function toggleConfigurationBlock(show) {
 }
 
 function refreshActiveTab() {
-  setTimeout(() => {
+  chrome.runtime.sendMessage({ type: WebsiteBlocker.RULE_RECONCILE_MESSAGE }, function (response) {
+    if (chrome.runtime.lastError || !response || !response.ok) {
+      const errorMessage = chrome.runtime.lastError
+        ? chrome.runtime.lastError.message
+        : response && response.error;
+      console.error(errorMessage || 'Blocking rules could not be updated.');
+      showInfoMessage('Blocking rules could not be updated. Reload the extension and try again.', false);
+      return;
+    }
+
     chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
       if (tabs[0] && WebsiteBlocker.parseHttpInput(tabs[0].url)) {
         chrome.tabs.update(tabs[0].id, { url: tabs[0].url });
       }
     });
-  }, 500);
+  });
 }

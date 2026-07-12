@@ -25,3 +25,11 @@ Use the extension options page to edit entries, build named weekly schedules, fi
 
 Temporary blocks are kept in the list after expiry with an `Expired` status, so they can be reviewed or cleared later.
 Scheduled blocks use the browser's local time. Overnight schedules such as `22:00-06:00` are supported.
+
+## Development
+
+Run the dependency-free test suite with:
+
+```text
+node --test
+```

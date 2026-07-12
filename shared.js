@@ -2,7 +2,7 @@ var WebsiteBlocker = (function () {
   const STORAGE_KEY = 'blockedWebsites';
   const SCHEDULES_STORAGE_KEY = 'blockSchedules';
   const RULE_REFRESH_ALARM_NAME = 'website-blocker-rule-refresh';
-  const EXPIRATION_ALARM_NAME = RULE_REFRESH_ALARM_NAME;
+  const RULE_RECONCILE_MESSAGE = 'website-blocker-reconcile-rules';
   const DEFAULT_DURATION_MINUTES = 30;
   const MINUTE_MS = 60 * 1000;
   const HOUR_MS = 60 * MINUTE_MS;
@@ -519,7 +519,6 @@ var WebsiteBlocker = (function () {
     if (!normalizedSchedule) return [];
 
     const date = new Date(now);
-    const todayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
     const today = date.getDay();
     const transitions = [];
 
@@ -528,15 +527,11 @@ var WebsiteBlocker = (function () {
       for (const interval of normalizedSchedule.intervals) {
         if (interval.day !== day) continue;
 
-        const dayStart = todayStart + (dayOffset * DAY_MS);
         const startMinutes = timeToMinutes(interval.start);
         const endMinutes = timeToMinutes(interval.end);
-        const startAt = dayStart + (startMinutes * MINUTE_MS);
-        const endAt = dayStart + (
-          endMinutes > startMinutes
-            ? endMinutes * MINUTE_MS
-            : DAY_MS + (endMinutes * MINUTE_MS)
-        );
+        const startAt = getLocalScheduleTime(date, dayOffset, startMinutes);
+        const endDayOffset = endMinutes > startMinutes ? dayOffset : dayOffset + 1;
+        const endAt = getLocalScheduleTime(date, endDayOffset, endMinutes);
 
         if (startAt > now) transitions.push(startAt);
         if (endAt > now) transitions.push(endAt);
@@ -544,6 +539,18 @@ var WebsiteBlocker = (function () {
     }
 
     return transitions;
+  }
+
+  function getLocalScheduleTime(baseDate, dayOffset, minutes) {
+    return new Date(
+      baseDate.getFullYear(),
+      baseDate.getMonth(),
+      baseDate.getDate() + dayOffset,
+      Math.floor(minutes / 60),
+      minutes % 60,
+      0,
+      0
+    ).getTime();
   }
 
   function isExpiredEntry(entry, now = Date.now()) {
@@ -568,8 +575,10 @@ var WebsiteBlocker = (function () {
   }
 
   function expireEntries(entries, now = Date.now()) {
-    let changed = false;
-    const nextEntries = normalizeBlockedWebsites(entries, now).map(entry => {
+    const sourceEntries = Array.isArray(entries) ? entries : [];
+    const normalizedEntries = normalizeBlockedWebsites(sourceEntries, now);
+    let changed = !Array.isArray(entries) || JSON.stringify(sourceEntries) !== JSON.stringify(normalizedEntries);
+    const nextEntries = normalizedEntries.map(entry => {
       if (
         entry.status === WEBSITE_BLOCK_STATUS.ACTIVE &&
         entry.type === WEBSITE_BLOCK_TYPE.TEMPORARY &&
@@ -697,7 +706,7 @@ var WebsiteBlocker = (function () {
     STORAGE_KEY,
     SCHEDULES_STORAGE_KEY,
     RULE_REFRESH_ALARM_NAME,
-    EXPIRATION_ALARM_NAME,
+    RULE_RECONCILE_MESSAGE,
     DEFAULT_DURATION_MINUTES,
     WEEKDAY_LABELS,
     createEntry,
