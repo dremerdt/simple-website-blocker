@@ -137,8 +137,23 @@ button:disabled {
   margin-top: 10px;
 }
 
-.schedule-panel select {
+.schedule-select-row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) 34px;
+}
+
+.schedule-select-row select {
   width: 100%;
+}
+
+.icon-button {
+  align-items: center;
+  display: inline-flex;
+  font-size: 20px;
+  justify-content: center;
+  padding: 0;
+  width: 34px;
 }
 
 .button-row {

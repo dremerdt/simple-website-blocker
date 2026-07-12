@@ -15,7 +15,8 @@ document.addEventListener('DOMContentLoaded', function () {
     durationInput: document.getElementById('blockDuration'),
     durationUnit: document.getElementById('blockDurationUnit'),
     schedulePanel: document.getElementById('blockConfigurationSchedule'),
-    scheduleSelect: document.getElementById('scheduleSelect')
+    scheduleSelect: document.getElementById('scheduleSelect'),
+    openManageButton: document.getElementById('openManageButton')
   };
 
   const state = {
@@ -110,6 +111,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
   refs.moreButton.addEventListener('click', function () {
     toggleConfigurationBlock();
+  });
+
+  refs.openManageButton.addEventListener('click', function () {
+    chrome.runtime.openOptionsPage();
   });
 
   refs.showBlockedButton.addEventListener('click', function () {
